@@ -1,0 +1,735 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>SecureLens 진행 지도</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: left briefing rail (what matters now, per-area progress) + right 3D orbit view.
+   The 3D view shows only the 7 areas until one is focused; then that area's tasks fan out with labels. */
+:root {
+  --ink: #0a0a0a;        /* page ground */
+  --ink-2: #121212;      /* rail / panels */
+  --ink-3: #1d1d1d;      /* hover / track */
+  --line: #2e2e2e;       /* hairlines */
+  --paper: #f4f4f4;      /* primary text */
+  --muted: #8c8c8c;      /* secondary text */
+  --accent: #ffffff;     /* focus, selection */
+  --done: #4fc79a;
+  --doing: #f0b54a;
+  --todo: #6b6b6b;
+  --issue: #f26d6a;
+  --f-sans: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--ink); color: var(--paper); font-family: var(--f-sans); font-size: 14px; }
+button { font: inherit; color: inherit; }
+.app { display: grid; grid-template-columns: 360px minmax(0, 1fr); height: 100%; }
+
+/* ---------- rail ---------- */
+.rail { background: var(--ink-2); border-right: 1px solid var(--line); overflow-y: auto; padding: 22px 20px 28px; display: grid; align-content: start; gap: 22px; }
+.brand .eyebrow { font-family: var(--f-mono); font-size: 11px; letter-spacing: .12em; color: var(--muted); text-transform: uppercase; }
+.brand h1 { margin: 4px 0 0; font-size: 22px; font-weight: 700; letter-spacing: -.01em; }
+.brand p { margin: 6px 0 0; color: var(--muted); font-size: 12.5px; line-height: 1.5; }
+
+.score { display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: center; }
+.donut { width: 92px; height: 92px; }
+.donut text { font-family: var(--f-mono); }
+.score .facts { display: grid; gap: 6px; }
+.score .wk { font-size: 13px; color: var(--muted); }
+.score .wk b { color: var(--paper); font-size: 15px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 9px; border-radius: 999px; border: 1px solid var(--line); background: transparent; cursor: pointer; font-size: 12px; font-variant-numeric: tabular-nums; }
+.chip[aria-pressed="false"] { opacity: .38; }
+.chip:focus-visible, .row:focus-visible, .area:focus-visible, .tool:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; flex: none; display: inline-block; }
+
+.sec h2 { margin: 0 0 8px; font-size: 12px; font-weight: 600; letter-spacing: .06em; color: var(--muted); display: flex; justify-content: space-between; }
+.sec h2 span { font-family: var(--f-mono); font-weight: 400; }
+.list { display: grid; gap: 2px; }
+.row { all: unset; box-sizing: border-box; cursor: pointer; display: grid; grid-template-columns: 8px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 8px; border-radius: 7px; }
+.row:hover { background: var(--ink-3); }
+.row .t { font-size: 13.5px; line-height: 1.35; min-width: 0; }
+.row .t small { display: block; color: var(--muted); font-size: 11.5px; margin-top: 1px; }
+.row .w { font-family: var(--f-mono); font-size: 11px; color: var(--muted); }
+.empty-note { color: var(--muted); font-size: 12.5px; padding: 4px 8px; }
+
+.areas { display: grid; gap: 4px; }
+.area { all: unset; box-sizing: border-box; cursor: pointer; display: grid; gap: 6px; padding: 9px 10px; border-radius: 8px; border: 1px solid transparent; }
+.area:hover { background: var(--ink-3); }
+.area.on { border-color: var(--accent); background: var(--ink-3); }
+.area .top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.area .name { font-size: 14px; font-weight: 600; }
+.area .pct { font-family: var(--f-mono); font-size: 13px; }
+.area .cnt { font-size: 11.5px; color: var(--muted); }
+.seg { display: flex; height: 5px; border-radius: 3px; overflow: hidden; background: var(--ink-3); gap: 1px; }
+.seg i { display: block; height: 100%; }
+.sync { font-size: 11.5px; color: var(--muted); line-height: 1.55; border-top: 1px solid var(--line); padding-top: 14px; }
+.sync b { color: var(--paper); font-weight: 500; }
+
+/* ---------- 3D view ---------- */
+.view { position: relative; overflow: hidden; min-height: 0; }
+#stage { position: absolute; inset: 0; }
+#stage canvas { display: block; outline: none; }
+#labels { position: absolute; inset: 0; pointer-events: none; }
+.lbl { position: absolute; left: 0; top: 0; white-space: nowrap; pointer-events: auto; cursor: pointer; will-change: transform, opacity; transition: opacity .25s; }
+.lbl.area-l { text-align: center; }
+.lbl.area-l .n { font-size: 14px; font-weight: 600; text-shadow: 0 1px 8px var(--ink), 0 0 2px var(--ink); }
+.lbl.area-l .p { font-family: var(--f-mono); font-size: 12px; color: var(--muted); text-shadow: 0 0 6px var(--ink); }
+.lbl.task-l { font-size: 12.5px; padding: 3px 8px; border-radius: 5px; background: color-mix(in srgb, var(--ink) 82%, transparent); border: 1px solid var(--line); display: flex; align-items: center; gap: 6px; }
+.lbl.task-l:hover, .lbl.sel { border-color: var(--accent); }
+.lbl .new { font-family: var(--f-mono); font-size: 9px; letter-spacing: .06em; color: var(--ink); background: var(--accent); border-radius: 3px; padding: 1px 4px; }
+.lbl.root-l { font-size: 13px; font-weight: 700; letter-spacing: .04em; text-shadow: 0 0 8px var(--ink); }
+
+.toolbar { position: absolute; top: 14px; left: 14px; right: 14px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; pointer-events: none; }
+.tool { pointer-events: auto; cursor: pointer; border: 1px solid var(--line); background: color-mix(in srgb, var(--ink-2) 90%, transparent); border-radius: 7px; padding: 6px 11px; font-size: 12.5px; }
+.tool:hover { border-color: var(--accent); }
+.crumbs { pointer-events: none; font-size: 13px; color: var(--muted); }
+.crumbs b { color: var(--paper); }
+.hintbar { position: absolute; left: 14px; bottom: 14px; font-size: 11.5px; color: var(--muted); pointer-events: none; }
+.weekbox { position: absolute; right: 14px; bottom: 14px; width: min(300px, calc(100% - 28px)); background: color-mix(in srgb, var(--ink-2) 92%, transparent); border: 1px solid var(--line); border-radius: 8px; padding: 9px 12px; display: grid; gap: 4px; }
+.weekbox .r { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
+.weekbox .r b { color: var(--paper); font-family: var(--f-mono); font-weight: 500; }
+.weekbox input { width: 100%; accent-color: var(--accent); margin: 0; }
+
+/* ---------- detail ---------- */
+.detail { position: absolute; top: 58px; right: 14px; bottom: 80px; width: min(350px, calc(100% - 28px)); background: var(--ink-2); border: 1px solid var(--line); border-radius: 10px; padding: 18px; overflow-y: auto; display: grid; align-content: start; gap: 12px; box-shadow: 0 18px 50px rgba(0,0,0,.35); }
+.detail .x { position: absolute; top: 10px; right: 10px; border: 0; background: none; color: var(--muted); font-size: 20px; cursor: pointer; padding: 4px 8px; }
+.detail .path { font-size: 11.5px; color: var(--muted); }
+.detail h3 { margin: 0; font-size: 18px; line-height: 1.35; padding-right: 24px; }
+.badges { display: flex; flex-wrap: wrap; gap: 6px; }
+.badge { font-size: 11.5px; border-radius: 999px; padding: 2px 9px; border: 1px solid var(--line); color: var(--muted); }
+.detail .note { font-size: 13.5px; line-height: 1.65; white-space: pre-wrap; }
+.detail hr { border: 0; border-top: 1px solid var(--line); margin: 2px 0; width: 100%; }
+.detail .cap { font-size: 11.5px; color: var(--muted); letter-spacing: .05em; }
+.links { display: grid; gap: 6px; }
+.links a { display: grid; gap: 2px; color: var(--paper); text-decoration: none; font-size: 13px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 7px; }
+.links a:hover, .links a:focus-visible { border-color: var(--accent); outline: none; }
+.links a small { color: var(--muted); font-family: var(--f-mono); font-size: 10.5px; }
+details.edit summary { cursor: pointer; font-size: 12.5px; color: var(--accent); }
+details.edit[open] { display: grid; gap: 10px; }
+details.edit label { display: grid; gap: 5px; font-size: 11.5px; color: var(--muted); }
+.stat { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.stat button { cursor: pointer; padding: 6px 0; border-radius: 6px; border: 1px solid var(--line); background: none; font-size: 12px; color: var(--muted); }
+.stat button[aria-pressed="true"] { color: var(--ink); font-weight: 700; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+textarea, input[type=text], input[type=number] { font: inherit; font-size: 13px; color: var(--paper); background: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 7px 8px; width: 100%; box-sizing: border-box; }
+textarea { min-height: 80px; resize: vertical; }
+.act { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.btn { cursor: pointer; font-size: 13px; padding: 7px 12px; border-radius: 6px; border: 1px solid var(--line); background: none; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--ink); font-weight: 700; }
+.msg { font-size: 12px; color: var(--muted); }
+
+#loading { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; color: var(--muted); line-height: 1.7; padding-inline: 16px; pointer-events: none; }
+
+/* ---------- mode switch + architecture (구성도) ----------
+   Same data, second lens: system blocks coloured by the progress of the tasks mapped to them. */
+.modes { pointer-events: auto; display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: color-mix(in srgb, var(--ink-2) 90%, transparent); }
+.modes button { all: unset; cursor: pointer; padding: 6px 12px; font-size: 12.5px; color: var(--muted); }
+.modes button[aria-pressed="true"] { background: var(--accent); color: var(--ink); font-weight: 700; }
+.modes button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+body.arch .map-only { display: none !important; }
+body:not(.arch) .arch-only { display: none !important; }
+body.arch .view::before { /* fade under the floating toolbar so scrolled content doesn't collide with it */
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 56px; z-index: 1; pointer-events: none; background: linear-gradient(180deg, var(--ink) 62%, transparent); }
+body.arch .toolbar { z-index: 2; }
+#arch { position: absolute; inset: 0; overflow: auto; padding: 62px 20px 96px; background: var(--ink); isolation: isolate; }
+.steps { display: grid; gap: 12px; margin-bottom: 20px; max-width: 980px; }
+.stepnav { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.stepnav .lab { font-size: 12px; color: var(--muted); margin-right: 4px; }
+.stepnav button { cursor: pointer; min-width: 30px; height: 30px; border-radius: 7px; border: 1px solid var(--line); background: none; font-family: var(--f-mono); font-size: 12.5px; color: var(--muted); padding: 0 9px; }
+.stepnav button:hover { border-color: var(--muted); color: var(--paper); }
+.stepnav button[aria-pressed="true"] { background: var(--paper); border-color: var(--paper); color: var(--ink); font-weight: 700; }
+.caption { border-left: 2px solid var(--paper); padding: 4px 0 4px 14px; min-height: 76px; }
+.caption h4 { margin: 0 0 5px; font-size: 18px; letter-spacing: -.01em; }
+.caption p { margin: 0; font-size: 14.5px; line-height: 1.7; max-width: 76ch; color: #d6d6d6; }
+.caption .meta { font-size: 12px; color: var(--muted); margin-top: 7px; }
+.board { position: relative; display: grid; grid-template-columns: repeat(5, minmax(150px, 1fr)); column-gap: 42px; row-gap: 12px; min-width: 920px; }
+.board svg.edges { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; z-index: 0; }
+.edges path.e { fill: none; stroke: #444; stroke-width: 1.4; transition: stroke .2s, opacity .2s; }
+.edges path.e.reg { stroke-dasharray: 4 4; }
+.edges path.e.on { stroke: var(--paper); stroke-width: 1.8; }
+.edges path.e.off { opacity: .15; }
+.colh { font-family: var(--f-mono); font-size: 11px; color: var(--muted); letter-spacing: .08em; padding: 0 2px 6px; border-bottom: 1px solid var(--line); align-self: end; }
+.colh span { color: var(--paper); margin-right: 8px; }
+.colh.band { margin-top: 18px; }
+.blk { all: unset; box-sizing: border-box; cursor: pointer; position: relative; z-index: 1; display: grid; gap: 5px; align-content: start; padding: 10px 11px 10px 13px; border-radius: 8px; background: var(--ink-2); border: 1px solid var(--line); transition: opacity .2s, border-color .2s; }
+.blk::before { content: ""; position: absolute; left: -1px; top: 10px; bottom: 10px; width: 2px; border-radius: 2px; background: var(--bc, var(--todo)); } /* status mark */
+.blk:hover { border-color: #555; }
+.blk:focus-visible { outline: 2px solid var(--paper); outline-offset: 2px; }
+.blk.planned { border-style: dashed; background: transparent; }
+.blk.dim { opacity: .25; }
+.blk.on { border-color: var(--paper); box-shadow: 0 10px 30px rgba(0,0,0,.5); }
+.blk.hit { border-color: #9a9a9a; }
+.blk .bh { display: flex; align-items: center; gap: 7px; font-size: 13.5px; font-weight: 600; line-height: 1.3; }
+.blk .role { font-size: 12px; color: var(--muted); line-height: 1.45; }
+.blk .tech { font-family: var(--f-mono); font-size: 10.5px; color: #bdbdbd; }
+.blk .cnt { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.blk .cnt b { color: var(--issue); font-weight: 600; }
+.legend { display: flex; gap: 18px; font-size: 11.5px; color: var(--muted); margin-top: 16px; flex-wrap: wrap; align-items: center; }
+.legend i { display: inline-block; width: 26px; border-top: 1.5px solid var(--paper); vertical-align: middle; margin-right: 6px; }
+.legend i.reg { border-top-style: dashed; }
+.legend i.box { width: 16px; height: 10px; border: 1px dashed var(--muted); }
+.detail .tech { font-family: var(--f-mono); font-size: 12px; color: #bdbdbd; }
+.files { font-family: var(--f-mono); font-size: 11.5px; color: var(--muted); line-height: 1.7; }
+.cbtns { display: flex; flex-wrap: wrap; gap: 6px; }
+.cbtn { cursor: pointer; font-size: 12.5px; padding: 6px 10px; border-radius: 7px; border: 1px solid var(--line); background: none; }
+.cbtn:hover, .cbtn:focus-visible { border-color: var(--accent); outline: none; }
+.row.mark { background: var(--ink-3); box-shadow: inset 2px 0 0 var(--accent); }
+
+@media (max-width: 860px) {
+  #arch { padding: 56px 12px 90px; }
+  .board { grid-template-columns: 1fr; min-width: 0; }
+  .board svg.edges, .colh { display: none; }
+  .blk { grid-area: auto !important; }
+}
+@media (max-width: 860px) {
+  html, body { height: auto; }
+  .app { grid-template-columns: 1fr; height: auto; }
+  .view { height: 62vh; order: -1; }
+  .rail { border-right: 0; border-top: 1px solid var(--line); padding-inline: 16px; }
+  .detail { position: fixed; top: auto; left: 12px; right: 12px; bottom: 12px; width: auto; max-height: 62vh; z-index: 10; }
+  .weekbox { width: 190px; }
+  .hintbar { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .lbl { transition: none; } }
+</style>
+
+<div class="app">
+  <aside class="rail">
+    <div class="brand">
+      <div class="eyebrow">프리캡스톤 · 소만사 주제 2</div>
+      <h1>SecureLens 진행 지도</h1>
+      <p>임베딩 기반 변형 우회 탐지 및 기밀 유출 차단 시스템 · 김유정 · 윤은원</p>
+    </div>
+
+    <div class="score">
+      <svg class="donut" viewBox="0 0 100 100" aria-label="전체 진행률">
+        <circle cx="50" cy="50" r="42" fill="none" stroke="var(--ink-3)" stroke-width="9"></circle>
+        <g id="donutArcs" transform="rotate(-90 50 50)"></g>
+        <text id="donutPct" x="50" y="52" text-anchor="middle" dominant-baseline="middle" fill="var(--paper)" font-size="22">–</text>
+        <text x="50" y="70" text-anchor="middle" fill="var(--muted)" font-size="9">완료</text>
+      </svg>
+      <div class="facts">
+        <div class="wk"><b id="wkNow">–</b> · 전체 <span id="totalN">–</span>개 작업</div>
+        <div class="chips" id="chips"></div>
+      </div>
+    </div>
+
+    <section class="sec">
+      <h2>지금 챙길 것 <span id="focusN"></span></h2>
+      <div class="list" id="focusList"><div class="empty-note">불러오는 중입니다.</div></div>
+    </section>
+
+    <section class="sec">
+      <h2>영역별 진행 <span id="areaHint">누르면 3D에서 펼쳐짐</span></h2>
+      <div class="areas" id="areas"></div>
+    </section>
+
+    <section class="sec">
+      <h2>다음 주 예정 <span id="nextN"></span></h2>
+      <div class="list" id="nextList"></div>
+    </section>
+
+    <div class="sync" id="sync">자동 갱신 기록을 불러오는 중입니다.</div>
+  </aside>
+
+  <main class="view">
+    <div id="stage" class="map-only" aria-label="3D 진행 지도"></div>
+    <div id="labels" class="map-only"></div>
+    <section id="arch" class="arch-only" aria-label="시스템 구성도">
+      <div class="steps">
+        <div class="stepnav" id="stepNav"><span class="lab">설명 순서</span><button type="button" data-d="-1" aria-label="이전 단계">◀</button><span id="stepBtns" style="display:contents"></span><button type="button" data-d="1" aria-label="다음 단계">▶</button></div>
+        <div class="caption" id="caption" aria-live="polite"></div>
+      </div>
+      <div class="board" id="board"><svg class="edges" id="edges" aria-hidden="true"></svg></div>
+      <div class="legend"><span><i></i>탐지 흐름</span><span><i class="reg"></i>등록 흐름</span><span><i class="box"></i>점선 블록 = 아직 계획 단계</span><span>블록 왼쪽 색 = 연결된 작업의 진행 상태</span></div>
+    </section>
+    <div class="toolbar">
+      <div class="modes" id="modes" role="group" aria-label="보기 전환"><button type="button" data-m="map" aria-pressed="true">3D 진행 지도</button><button type="button" data-m="arch" aria-pressed="false">시스템 구성도</button></div>
+      <button class="tool map-only" id="btnAll" type="button">전체 보기</button>
+      <button class="tool map-only" id="btnSpin" type="button" aria-pressed="true">회전 멈춤</button>
+      <span class="crumbs" id="crumbs"></span>
+    </div>
+    <div class="hintbar map-only">드래그 회전 · 스크롤 확대 · 영역 구를 누르면 세부 작업이 펼쳐집니다</div>
+    <div class="weekbox">
+      <div class="r"><span>주차 되감기</span><b id="wkLabel">–</b></div>
+      <input type="range" id="week" min="1" max="15" step="1" value="6" aria-label="주차 선택">
+    </div>
+    <aside class="detail" id="detail" hidden></aside>
+    <div id="loading">진행 지도를 불러오는 중입니다.</div>
+  </main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(() => {
+  const ST = {
+    issue: { ko: "문제", v: "--issue" },
+    doing: { ko: "진행 중", v: "--doing" },
+    todo:  { ko: "예정", v: "--todo" },
+    done:  { ko: "완료", v: "--done" },
+  };
+  const ORDER = ["done", "doing", "issue", "todo"];
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const SEM_START = new Date(2026, 7, 31); // 1주차 월요일
+  const CUR_WEEK = Math.max(1, Math.min(15, Math.floor((Date.now() - SEM_START) / 864e5 / 7) + 1));
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+  let nodes = new Map(), selected = null, focusArea = null, weekView = CUR_WEEK, hiddenSt = new Set();
+  let db = null, canWrite = false;
+  let mode = "map", step = 0, selComp = null; // mode: "map" (3D) | "arch" (구성도)
+
+  // ---------- data helpers ----------
+  const kids = id => [...nodes.values()].filter(n => (n.parent || "") === id).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  const root = () => [...nodes.values()].find(n => !n.parent);
+  const areas = () => { const r = root(); return r ? kids(r.id) : []; };
+  const isGroup = id => kids(id).length > 0;
+  function tasksOf(id) { const k = kids(id); return k.length ? k.flatMap(c => tasksOf(c.id)) : [nodes.get(id)]; }
+  const allTasks = () => { const r = root(); return r ? tasksOf(r.id).filter(n => n.parent) : []; };
+  const st = n => (n.week != null && n.week > weekView) ? "todo" : (ST[n.status] ? n.status : "todo");
+  const pct = id => { const t = tasksOf(id); return t.length ? Math.round(100 * t.filter(n => st(n) === "done").length / t.length) : 0; };
+  const areaOf = n => { let p = n; while (p && p.parent && nodes.get(p.parent)?.parent) p = nodes.get(p.parent); return p; };
+  const fresh = n => !!n.changedAt && (Date.now() - Date.parse(n.changedAt)) < 3 * 864e5;
+  const groupSt = id => { const t = tasksOf(id); if (t.some(n => st(n) === "issue")) return "issue"; const p = pct(id); return p === 100 ? "done" : (p > 0 || t.some(n => st(n) === "doing")) ? "doing" : "todo"; };
+
+  // ---------- rail ----------
+  const rowHtml = (n, mark = false) => { const a = areaOf(n); return `<button class="row${mark ? " mark" : ""}" data-id="${esc(n.id)}"><span class="dot" style="background:var(${ST[st(n)].v})"></span><span class="t">${esc(n.label)}<small>${esc(a?.label || "")}${n.owner ? " · " + esc(n.owner) : ""}</small></span><span class="w">${n.week != null ? "W" + n.week : ""}</span></button>`; };
+  function renderRail() {
+    const t = allTasks(); const c = s => t.filter(n => st(n) === s).length;
+    const r = root();
+    $("donutPct").textContent = (r ? pct(r.id) : 0) + "%";
+    let acc = 0; const C = 2 * Math.PI * 42;
+    $("donutArcs").innerHTML = ORDER.map(s => { const f = c(s) / Math.max(1, t.length); const seg = `<circle cx="50" cy="50" r="42" fill="none" stroke="var(${ST[s].v})" stroke-width="9" stroke-dasharray="${Math.max(0, f * C - 1.5)} ${C}" stroke-dashoffset="${-acc * C}"></circle>`; acc += f; return seg; }).join("");
+    $("wkNow").textContent = weekView + "주차" + (weekView === CUR_WEEK ? "" : " 시점");
+    $("totalN").textContent = t.length;
+    $("chips").innerHTML = ORDER.map(s => `<button class="chip" data-s="${s}" aria-pressed="${!hiddenSt.has(s)}"><span class="dot" style="background:var(${ST[s].v})"></span>${ST[s].ko} ${c(s)}</button>`).join("");
+
+    const row = n => rowHtml(n);
+    const focus = [...t.filter(n => st(n) === "issue"), ...t.filter(n => st(n) === "doing"), ...t.filter(n => st(n) === "todo" && n.week === weekView)];
+    $("focusN").textContent = focus.length + "건";
+    $("focusList").innerHTML = focus.length ? focus.map(row).join("") : `<div class="empty-note">지금 챙길 작업이 없습니다.</div>`;
+    const next = t.filter(n => st(n) === "todo" && n.week === weekView + 1);
+    $("nextN").textContent = (weekView + 1) + "주차 · " + next.length + "건";
+    $("nextList").innerHTML = next.length ? next.map(row).join("") : `<div class="empty-note">예정된 작업이 없습니다.</div>`;
+
+    $("areas").innerHTML = areas().map(a => {
+      const tt = tasksOf(a.id); const k = s => tt.filter(n => st(n) === s).length;
+      return `<button class="area${focusArea === a.id ? " on" : ""}" data-area="${esc(a.id)}">
+        <div class="top"><span class="name">${esc(a.label)}</span><span class="pct">${pct(a.id)}%</span></div>
+        <div class="seg">${ORDER.filter(s => k(s)).map(s => `<i style="flex:${k(s)};background:var(${ST[s].v})"></i>`).join("")}</div>
+        <div class="cnt">완료 ${k("done")}/${tt.length}${k("issue") ? ` · 문제 ${k("issue")}` : ""}${k("doing") ? ` · 진행 중 ${k("doing")}` : ""}</div></button>`;
+    }).join("");
+  }
+  document.querySelector(".rail").addEventListener("click", e => {
+    const chip = e.target.closest(".chip"); if (chip) { const s = chip.dataset.s; hiddenSt.has(s) ? hiddenSt.delete(s) : hiddenSt.add(s); refresh(); return; }
+    const ar = e.target.closest(".area"); if (ar) { setFocus(focusArea === ar.dataset.area ? null : ar.dataset.area); return; }
+    const rw = e.target.closest(".row"); if (rw) { const n = nodes.get(rw.dataset.id); if (!n) return;
+      if (mode === "arch") { selected = n.id; selComp = compsOf(n)[0] || null; step = 0; refresh(); renderDetail(); return; }
+      setFocus(areaOf(n)?.id || null, false); select(n.id); }
+  });
+
+  // ---------- three.js ----------
+  const view = document.querySelector(".view"), stage = $("stage"), labelsEl = $("labels");
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setClearColor(new THREE.Color(css("--ink")));
+  stage.appendChild(renderer.domElement);
+  const scene = new THREE.Scene();
+  scene.fog = new THREE.Fog(new THREE.Color(css("--ink")), 38, 80);
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 200);
+  const HOME = new THREE.Vector3(0, 13, 30);
+  camera.position.copy(HOME);
+  const controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true; controls.dampingFactor = 0.08; controls.minDistance = 7; controls.maxDistance = 60;
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let spin = !reduce; controls.autoRotate = spin; controls.autoRotateSpeed = 0.35;
+  const spinBtn = $("btnSpin");
+  const setSpin = v => { spin = v; controls.autoRotate = v; spinBtn.textContent = v ? "회전 멈춤" : "회전 켜기"; spinBtn.setAttribute("aria-pressed", v); };
+  setSpin(spin);
+  spinBtn.onclick = () => setSpin(!spin);
+  controls.addEventListener("start", () => setSpin(false));
+
+  scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+  const sun = new THREE.DirectionalLight(0xffffff, 0.75); sun.position.set(8, 20, 14); scene.add(sun);
+  const orbit = new THREE.Mesh(new THREE.RingGeometry(11.9, 12.0, 128), new THREE.MeshBasicMaterial({ color: new THREE.Color(css("--line")), side: THREE.DoubleSide, transparent: true, opacity: .8 }));
+  orbit.rotation.x = -Math.PI / 2; scene.add(orbit);
+  const grid = new THREE.PolarGridHelper(26, 12, 6, 64, new THREE.Color(css("--ink-3")), new THREE.Color(css("--ink-3")));
+  grid.position.y = -7; scene.add(grid);
+
+  let objs = new Map();
+  function size() { const r = view.getBoundingClientRect(); renderer.setSize(r.width, r.height); camera.aspect = r.width / Math.max(1, r.height); camera.updateProjectionMatrix(); }
+  new ResizeObserver(size).observe(view); size();
+
+  function layout() {
+    const pos = new Map(); const r = root(); if (!r) return pos;
+    pos.set(r.id, new THREE.Vector3(0, 0, 0));
+    const as = areas(), A = as.length || 1;
+    as.forEach((a, i) => {
+      const ang = (i / A) * Math.PI * 2 - Math.PI / 2 + Math.PI / A; // no area directly behind the centre
+      const ap = new THREE.Vector3(Math.cos(ang) * 12, 0, Math.sin(ang) * 12);
+      pos.set(a.id, ap);
+      const ch = kids(a.id), n = ch.length;
+      const out = ap.clone().normalize(), side = new THREE.Vector3(-out.z, 0, out.x);
+      ch.forEach((c, j) => { // tasks fan out on a vertical arc behind the area, readable when focused
+        const t = n === 1 ? 0 : (j / (n - 1)) * 2 - 1;
+        const p = ap.clone().add(out.clone().multiplyScalar(3.6 + (1 - t * t) * 1.2)).add(side.clone().multiplyScalar(t * 3.2)).add(new THREE.Vector3(0, 4.6 - (j / Math.max(1, n - 1)) * 9.2, 0));
+        pos.set(c.id, p);
+      });
+    });
+    return pos;
+  }
+
+  function rebuild() {
+    for (const o of objs.values()) { scene.remove(o.mesh); o.ring && scene.remove(o.ring); o.track && scene.remove(o.track); o.line && scene.remove(o.line); o.label.remove(); }
+    objs = new Map();
+    const pos = layout(); const r = root();
+    for (const n of nodes.values()) {
+      const p = pos.get(n.id); if (!p) continue;
+      const kind = !n.parent ? "root" : n.parent === r.id ? "area" : "task";
+      const rad = kind === "root" ? 1.5 : kind === "area" ? 1.15 : 0.32;
+      const mesh = new THREE.Mesh(new THREE.SphereGeometry(rad, 32, 24), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: .5, metalness: .05, transparent: true }));
+      mesh.position.copy(p); mesh.userData.id = n.id; scene.add(mesh);
+      let ring = null, track = null, line = null;
+      if (kind !== "task") {
+        track = new THREE.Mesh(new THREE.TorusGeometry(rad * 1.55, 0.07, 8, 96), new THREE.MeshBasicMaterial({ color: new THREE.Color(css("--ink-3")) }));
+        track.position.copy(p); scene.add(track);
+      }
+      if (n.parent && pos.get(n.parent)) {
+        const a = pos.get(n.parent), b = p, mid = a.clone().lerp(b, .5); if (kind === "task") mid.y = (a.y + b.y) / 2 + .8;
+        line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(new THREE.QuadraticBezierCurve3(a, mid, b).getPoints(24)), new THREE.LineBasicMaterial({ color: new THREE.Color(css("--line")), transparent: true }));
+        scene.add(line);
+      }
+      const label = document.createElement("div");
+      label.className = "lbl " + kind + "-l";
+      label.addEventListener("click", e => { e.stopPropagation(); kind === "area" ? setFocus(n.id) : kind === "root" ? setFocus(null) : select(n.id); });
+      labelsEl.appendChild(label);
+      objs.set(n.id, { mesh, ring, track, line, label, pos: p, kind, rad });
+    }
+    refresh();
+  }
+
+  function refresh() {
+    const col = {}; for (const s in ST) col[s] = new THREE.Color(css(ST[s].v));
+    for (const [id, o] of objs) {
+      const n = nodes.get(id);
+      const s = o.kind === "task" ? st(n) : groupSt(id);
+      const inFocus = o.kind !== "task" || (!!focusArea && n.parent === focusArea);
+      const off = o.kind === "task" && hiddenSt.has(s);
+      o.visible = inFocus && !off;
+      o.mesh.material.color.copy(o.kind === "root" ? new THREE.Color(css("--paper")) : col[s]);
+      const dimArea = o.kind === "area" && focusArea && focusArea !== id;
+      o.mesh.material.opacity = o.kind === "task" ? (off ? .06 : inFocus ? 1 : .55) : dimArea ? .35 : 1;
+      o.mesh.visible = o.kind !== "task" || inFocus;
+      o.mesh.material.emissive.set(id === selected || id === focusArea ? css("--accent") : "#000000");
+      o.mesh.material.emissiveIntensity = id === selected ? .55 : id === focusArea ? .25 : 0;
+      if (o.line) { o.line.visible = o.kind !== "task" || inFocus; o.line.material.opacity = o.kind === "task" ? (off ? .15 : .9) : dimArea ? .3 : .9; }
+      if (o.kind !== "task") { // progress arc
+        if (o.ring) scene.remove(o.ring);
+        const p = pct(id) / 100;
+        if (p > 0) { o.ring = new THREE.Mesh(new THREE.TorusGeometry(o.rad * 1.55, 0.11, 8, 96, Math.PI * 2 * p), new THREE.MeshBasicMaterial({ color: col.done })); o.ring.position.copy(o.pos); scene.add(o.ring); }
+        else o.ring = null;
+      }
+      if (o.kind === "area") o.label.innerHTML = `<div class="n">${esc(n.label)}</div><div class="p">${pct(id)}% · ${tasksOf(id).length}개</div>`;
+      else if (o.kind === "root") o.label.textContent = "SECURELENS";
+      else o.label.innerHTML = `<span class="dot" style="background:var(${ST[s].v})"></span>${esc(n.label)}${fresh(n) ? '<span class="new">NEW</span>' : ""}`;
+      o.label.classList.toggle("sel", id === selected);
+    }
+    renderRail();
+    const fa = focusArea && nodes.get(focusArea);
+    $("crumbs").innerHTML = fa ? `<b>${esc(fa.label)}</b> · 작업 ${tasksOf(fa.id).length}개` : "7개 영역 전체";
+    $("wkLabel").textContent = weekView + "주차" + (weekView === CUR_WEEK ? " (현재)" : "");
+    $("areaHint").textContent = mode === "arch" ? "누르면 구성도에서 강조" : "누르면 3D에서 펼쳐짐";
+    if (mode === "arch") renderArch();
+  }
+
+  // ---------- camera ----------
+  let camGoal = null, tgtGoal = null;
+  function setFocus(id, clearSel = true) {
+    focusArea = id; if (clearSel) selected = null;
+    if (id && objs.get(id)) {
+      const p = objs.get(id).pos.clone(); const out = p.clone().normalize();
+      tgtGoal = p.clone().add(out.clone().multiplyScalar(3.4));
+      camGoal = tgtGoal.clone().add(out.clone().multiplyScalar(14)).add(new THREE.Vector3(0, 2.5, 0)); // outside the orbit, facing the fan with its area behind it
+      setSpin(false);
+    } else { tgtGoal = new THREE.Vector3(0, 0, 0); camGoal = HOME.clone(); }
+    refresh(); renderDetail();
+  }
+  $("btnAll").onclick = () => setFocus(null);
+
+  // ---------- picking ----------
+  const ray = new THREE.Raycaster(), ptr = new THREE.Vector2(); let down = null;
+  renderer.domElement.addEventListener("pointerdown", e => { down = [e.clientX, e.clientY]; });
+  renderer.domElement.addEventListener("pointerup", e => {
+    if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 5) return;
+    const r = view.getBoundingClientRect();
+    ptr.set((e.clientX - r.left) / r.width * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+    ray.setFromCamera(ptr, camera);
+    const hit = ray.intersectObjects([...objs.values()].map(o => o.mesh))[0];
+    if (!hit) { selected = null; refresh(); renderDetail(); return; }
+    const o = objs.get(hit.object.userData.id), n = nodes.get(hit.object.userData.id);
+    if (o.kind === "area") setFocus(n.id); else if (o.kind === "root") setFocus(null); else { if (n.parent !== focusArea) setFocus(n.parent, false); select(n.id); }
+  });
+
+  // ---------- detail ----------
+  const detail = $("detail");
+  function select(id) { selected = id; refresh(); renderDetail(); }
+  function renderDetail() {
+    if (mode === "arch") return renderCompDetail();
+    const n = selected && nodes.get(selected);
+    if (!n) { detail.hidden = true; return; }
+    detail.hidden = false;
+    const a = areaOf(n), s = st(n);
+    const lk = (Array.isArray(n.links) ? n.links : []).filter(l => l && /^https:\/\//.test(l.url));
+    let h = `<button class="x" id="dx" aria-label="닫기">×</button>
+      <div class="path">${esc(a?.label || "")}</div>
+      <h3>${esc(n.label)}</h3>
+      <div class="badges"><span class="badge" style="color:var(${ST[s].v});border-color:var(${ST[s].v})">${ST[s].ko}</span>
+        ${n.week != null ? `<span class="badge">${n.week}주차</span>` : ""}${n.owner ? `<span class="badge">${esc(n.owner)}</span>` : ""}${fresh(n) ? `<span class="badge" style="color:var(--accent);border-color:var(--accent)">최근 변경</span>` : ""}</div>
+      ${n.note ? `<div class="note">${esc(n.note)}</div>` : ""}
+      ${n.week != null && n.week > weekView ? `<div class="msg">${weekView}주차 시점으로 보고 있어 '예정'으로 표시됩니다.</div>` : ""}`;
+    if (lk.length) h += `<hr><div class="cap">NOTION 기록 ${lk.length}건</div><div class="links">${lk.map(l => `<a href="${esc(l.url)}" target="_blank" rel="noopener"><span>${esc(l.title || "Notion 카드")}</span><small>${esc(l.date || "")}</small></a>`).join("")}</div>`;
+    if (n.changedAt) h += `<div class="msg">마지막 변경 ${esc(String(n.changedAt).slice(0, 10))}${n.changedBy ? " · " + esc(n.changedBy) : ""}</div>`;
+    const cs = compsOf(n);
+    if (cs.length) h += `<hr><div class="cap">시스템 구성도에서 위치</div><div class="cbtns">${cs.map(c => `<button class="cbtn" type="button" data-c="${c}">${esc(COMP[c].name)} →</button>`).join("")}</div>`;
+    if (canWrite) h += `<hr><details class="edit"><summary>상태·메모 고치기</summary>
+        <div class="stat" id="stat">${["done", "doing", "issue", "todo"].map(k => `<button type="button" data-s="${k}" aria-pressed="${(n.status || "todo") === k}">${ST[k].ko}</button>`).join("")}</div>
+        <div class="two"><label>주차<input type="number" id="fWeek" min="1" max="15" value="${n.week ?? ""}"></label><label>담당<input type="text" id="fOwner" value="${esc(n.owner)}"></label></div>
+        <label>메모<textarea id="fNote">${esc(n.note)}</textarea></label>
+        <div class="act"><button class="btn primary" id="fSave" type="button">저장</button><span class="msg" id="msg"></span></div>
+        <label>같은 영역에 작업 추가<input type="text" id="fNew" placeholder="예: 엑셀 파서 단위 테스트"></label>
+        <div class="act"><button class="btn" id="fAdd" type="button">추가</button></div></details>`;
+    detail.innerHTML = h;
+    $("dx").onclick = () => { selected = null; refresh(); renderDetail(); };
+    detail.querySelectorAll(".cbtn").forEach(b => b.onclick = () => { selComp = b.dataset.c; step = 0; focusArea = null; setMode("arch"); });
+    if (!canWrite) return;
+    let pick = n.status || "todo";
+    const paint = () => detail.querySelectorAll("#stat button").forEach(b => { const on = b.dataset.s === pick; b.setAttribute("aria-pressed", on); b.style.background = on ? `var(${ST[b.dataset.s].v})` : ""; b.style.borderColor = on ? `var(${ST[b.dataset.s].v})` : ""; });
+    paint();
+    detail.querySelectorAll("#stat button").forEach(b => b.onclick = () => { pick = b.dataset.s; paint(); });
+    const msg = t => { const m = $("msg"); if (m) m.textContent = t; };
+    $("fSave").onclick = async () => {
+      const w = $("fWeek").value;
+      msg("저장 중…");
+      try { await db.collection("nodes").doc(n.id).update({ status: pick, note: $("fNote").value, owner: $("fOwner").value, week: w === "" ? null : Math.max(1, Math.min(15, +w)), changedAt: new Date().toISOString(), changedBy: "직접 수정" }); msg("저장했습니다."); }
+      catch (e) { if (e && e.code === "invalid_argument") { canWrite = false; renderDetail(); } else msg("저장하지 못했습니다. 잠시 후 다시 시도하세요."); }
+    };
+    $("fAdd").onclick = async () => {
+      const label = $("fNew").value.trim(); if (!label || !n.parent) return;
+      try { await db.collection("nodes").doc().set({ label, parent: n.parent, status: "todo", week: weekView, note: "", owner: "", order: kids(n.parent).length + 1, changedAt: new Date().toISOString(), changedBy: "직접 추가" }); $("fNew").value = ""; msg("추가했습니다."); }
+      catch (e) { msg("추가하지 못했습니다."); }
+    };
+  }
+
+  // ---------- week ----------
+  const weekEl = $("week"); weekEl.value = CUR_WEEK;
+  weekEl.addEventListener("input", () => { weekView = +weekEl.value; refresh(); renderDetail(); });
+
+  // ---------- architecture (구성도) ----------
+  // Blocks are the real modules in SecureLens_setup/. Tasks attach to blocks via TASK_COMPS, an optional
+  // node.comp field (string or array), or — for tasks added later — their area's default block.
+  const COLS = ["입력 · 등록", "판단 서버", "읽기 · 임베딩", "저장 · 비교", "판단 · 결과"];
+  const COMPS = [
+    { id: "data", at: "2/1/3/2", name: "기밀 원본 · 평가 데이터", role: "가상 기업 (주)한빛테크 기밀 원본과 변형·무관·반출 시나리오 세트", tech: "data_gen → dataset_hanbit", files: ["data_gen/build.py · validate.py", "dataset_hanbit/", "metadata.xlsx"] },
+    { id: "in_ui", at: "3/1/4/2", name: "업로드 화면", role: "직원이 파일을 올려 검사받는 테스트 화면", tech: "Streamlit", files: ["frontend/app.py"] },
+    { id: "in_mail", at: "4/1/5/2", name: "메일 게이트웨이 (확장)", role: "메일 첨부 반출을 같은 검사 API로 확인", tech: "모의 연동 예정", files: [] },
+    { id: "admin", at: "5/1/6/2", name: "관리자 · 감사 로그", role: "기밀 원본·공개 양식 등록, 차단 기준·가중치 수정, 판정 감사 로그 조회", tech: "/policy · /audit_log", files: ["backend/policy_settings.py", "backend/audit_log.py", "tools/demo_setup.py"] },
+    { id: "api", at: "3/2/5/3", name: "판단 서버", role: "모든 요청이 모이는 관문. 등록과 탐지를 한 파이프라인으로 처리", tech: "FastAPI", files: ["backend/main.py", "backend/pipeline.py"] },
+    { id: "clip", at: "2/3/3/4", name: "CLIP 모양 임베딩", role: "이미지의 '모양'을 벡터로. 회전·반전을 되돌려 비교", tech: "open_clip ViT-B-32 · TTA", files: ["ai/clip_model.py"] },
+    { id: "ocr", at: "3/3/4/4", name: "OCR 글자 읽기", role: "이미지 속 한글·영문 읽기. 기울기·밝기 재시도, 촬영 사진은 원근 보정", tech: "Tesseract kor+eng", files: ["ai/ocr_model.py", "ai/rectify.py"] },
+    { id: "textemb", at: "4/3/5/4", name: "텍스트 임베딩", role: "글자를 의미 벡터로 + 글자 3-gram 포함률, 의역은 e5 보조", tech: "sentence-transformers · e5", files: ["ai/text_embedding.py"] },
+    { id: "parser", at: "5/3/6/4", name: "문서 파서", role: "Word·PDF·엑셀·코드에서 본문과 표 추출", tech: "docx · pdf · openpyxl", files: ["ai/document_parser.py"] },
+    { id: "vdb", at: "2/4/3/5", name: "벡터 DB", role: "기밀 원본 벡터(이미지·문서)와 공개 양식 보관", tech: "ChromaDB", files: ["database/chroma_manager.py"] },
+    { id: "sim", at: "3/4/5/5", name: "유사도 · 1차 판정", role: "가장 닮은 기밀 찾기. 모양 0.7 + 글자 0.3, 공개 양식·타사 회사명은 제외, 식별값 일치는 경고", tech: "similarity · risk_policy", files: ["backend/similarity.py", "backend/risk_policy.py"] },
+    { id: "risk", at: "3/5/4/6", name: "리스크 엔진", role: "R = 100·M·S·(0.5L+0.25P+0.25T) + 강제 규칙 6종", tech: "M 확신 · S 상태 · L 등급 · P 권한 · T 우회", files: ["backend/risk_engine.py", "위험도 계산 공식/risk_scorer.py"] },
+    { id: "verdict", at: "4/5/5/6", name: "판정 · 사용자 안내", role: "안전 / 경고 / 차단, 차단 시 '사내 핵심 기밀' 안내. 승인·이의 흐름은 설계 단계", tech: "R < 30 · < 50 · ≥ 50", files: ["frontend/app.py", "backend/audit_log.py"] },
+    { id: "llm", at: "5/5/6/6", name: "판정 설명문", role: "결과를 관리자용 문장으로 설명. 판정에는 관여하지 않음", tech: "Ollama llama3 (로컬)", files: ["backend/ollama_client.py"] },
+    { id: "eval", at: "7/1/8/3", name: "평가 · 측정", role: "탐지율 · 오탐 · 시나리오 일치 · 판정 속도 측정", tech: "tests/step3~11", files: ["tests/", "data_gen/validate.py"] },
+    { id: "env", at: "7/3/8/4", name: "실행 환경", role: "Windows · macOS 양쪽 동작, 의존성 버전 고정", tech: "config.py · requirements", files: ["config.py", "requirements.txt"] },
+    { id: "plan", at: "7/4/8/6", name: "기획 · 발표", role: "계획서 → 주간 진도보고 → 중간 · 최종 발표", tech: "결과보고서 11/30", files: [] },
+  ];
+  const COMP = Object.fromEntries(COMPS.map(c => [c.id, c]));
+  const TASK_COMPS = {
+    a_clip: ["clip"], a_ocr: ["ocr"], a_ocrvar: ["ocr", "vdb"], a_seal: ["ocr", "sim"], a_text: ["textemb", "sim"], a_para: ["textemb"],
+    a_docs: ["parser"], a_xlsx: ["parser"], a_code: ["parser"], a_whitelist: ["vdb", "sim", "admin"],
+    d_conf: ["data"], d_hanbit: ["data"], d_variants: ["data"], d_align: ["data", "risk"], d_docs: ["data"], d_para: ["data"], d_meta: ["data", "vdb"],
+    e_win: ["env"], e_mac: ["env"], e_git: ["env"], e_req: ["env"],
+    r_policy: ["sim"], r_formula: ["risk"], r_grid: ["risk"], r_rules: ["risk"], r_perm: ["risk"], r_mismatch: ["risk"], r_profile: ["risk"], r_channel: ["risk", "in_mail"], r_server: ["api", "risk"],
+    u_api: ["api"], u_streamlit: ["in_ui"], u_notice: ["verdict"], u_ollama: ["llm"], u_admin: ["admin"], u_mail: ["in_mail"],
+    v_img: ["eval"], v_doc: ["eval"], v_fp: ["eval", "sim"], v_scen: ["eval", "risk"], v_varexp: ["eval"], v_speed: ["eval", "api"],
+  };
+  const AREA_COMP = { b_plan: "plan", b_env: "env", b_eval: "eval", b_data: "data", b_ui: "in_ui", b_risk: "risk", b_ai: "sim" };
+  const EDGES = [ // [from, to, flow]: reg = 등록, det = 탐지, both
+    ["data", "api", "reg"], ["admin", "api", "reg"], ["in_ui", "api", "det"], ["in_mail", "api", "det"],
+    ["api", "clip", "both"], ["api", "ocr", "both"], ["api", "parser", "both"], ["ocr", "textemb", "both"], ["parser", "textemb", "both"],
+    ["clip", "vdb", "reg"], ["textemb", "vdb", "reg"],
+    ["clip", "sim", "det"], ["textemb", "sim", "det"], ["vdb", "sim", "det"],
+    ["sim", "risk", "det"], ["risk", "verdict", "det"], ["verdict", "llm", "det"],
+  ];
+  const STEPS = [
+    { title: "기밀 원본 등록", flow: "reg", comps: ["data", "admin", "api", "clip", "ocr", "textemb", "parser", "vdb"],
+      text: "먼저 지켜야 할 회사 기밀(가상 기업 (주)한빛테크 문서·도면·코드)을 관리자가 등록합니다. 시스템은 이것을 그대로 저장하지 않고 '모양'과 '글자 의미'를 숫자 벡터로 바꿔 벡터 DB에 넣어 둡니다. 누구나 쓰는 공개 양식도 따로 등록해 오탐을 막습니다." },
+    { title: "파일 반출 시도", flow: "det", comps: ["in_ui", "in_mail", "api"],
+      text: "직원이 파일을 업로드하거나 메일에 첨부해 밖으로 보내려 하면, 그 파일이 판단 서버로 들어옵니다. 지금은 업로드 화면으로 시연하고, 메일 게이트웨이는 같은 검사 API를 붙이는 확장 단계입니다." },
+    { title: "내용 읽기", flow: "det", comps: ["api", "clip", "ocr", "textemb", "parser"],
+      text: "문서 파일은 파서로 본문과 표를 꺼내고, 이미지는 CLIP으로 '어떻게 생겼는지', OCR로 '무슨 글자가 쓰였는지'를 읽습니다. 회전·반전·밝기 같은 변형은 되돌려 보며 다시 읽고, 모니터를 찍은 사진은 원근을 펴서 읽기 때문에 단순한 우회로는 피할 수 없습니다." },
+    { title: "닮은 기밀 찾기", flow: "det", comps: ["clip", "textemb", "vdb", "sim"],
+      text: "벡터 DB에서 가장 닮은 기밀 원본을 찾아 유사도를 계산합니다. 이미지는 모양 0.7 + 글자 0.3으로 섞고, 글자가 공개 양식과만 겹치거나 인감의 회사명이 다르면 기밀로 보지 않습니다. 개인정보·거래처 한 건만 떼어 낸 경우는 전화번호·계좌 같은 식별값이 그대로 겹치는지로 잡습니다." },
+    { title: "위험도 계산", flow: "det", comps: ["sim", "risk"],
+      text: "닮았다는 것만으로 막지 않습니다. 얼마나 확실히 그 기밀인지(M)와 자산 상태(S)에, 보안등급(L)·보낸 사람의 권한 불일치(P)·우회 흔적(T)을 가중합한 값을 곱해 0~100점 R = 100·M·S·(0.5L+0.25P+0.25T)를 계산합니다. 권한 없는 사람이 극비를 보내면 차단, 허가된 사람은 최대 경고 같은 강제 규칙이 덧붙습니다." },
+    { title: "판정과 안내", flow: "det", comps: ["risk", "verdict", "llm", "in_ui", "admin"],
+      text: "R이 30 미만이면 안전, 50 미만이면 경고(승인 요청), 50 이상이면 차단(이의 신청)입니다. 차단되면 '사내 핵심 기밀로 분류된 자료입니다'라고 안내하고, 모든 판정은 파일 내용 없이 해시와 점수만 감사 로그에 남깁니다. Ollama는 관리자용 설명문만 붙이고 판정에는 관여하지 않습니다." },
+    { title: "직접 측정해 검증", flow: "det", comps: ["data", "eval"],
+      text: () => { const d = compTasks("eval").filter(n => st(n) === "done").map(n => n.label); return "변형본 · 무관 파일 · 반출 시나리오 데이터셋으로 직접 측정해 수치로 확인합니다." + (d.length ? " 지금까지: " + d.join(" / ") + "." : ""); } },
+  ];
+  const compsOf = n => {
+    const s = new Set(TASK_COMPS[n.id] || []);
+    [].concat(n.comp || []).forEach(c => COMP[c] && s.add(c));
+    if (!s.size) { const a = areaOf(n); if (a && AREA_COMP[a.id]) s.add(AREA_COMP[a.id]); }
+    return [...s];
+  };
+  const compTasks = c => allTasks().filter(n => compsOf(n).includes(c)).sort((a, b) => (a.week ?? 99) - (b.week ?? 99));
+
+  const board = $("board"), edgesSvg = $("edges");
+  board.insertAdjacentHTML("beforeend",
+    COLS.map((t, i) => `<div class="colh" style="grid-area:1/${i + 1}/2/${i + 2}"><span>${i + 1}</span>${t}</div>`).join("") +
+    `<div class="colh band" style="grid-area:6/1/7/6">지원 영역 — 데이터로 검증하고, 환경을 갖추고, 교과 일정에 맞춰 발표</div>` +
+    COMPS.map(c => `<button class="blk" type="button" data-c="${c.id}" style="grid-area:${c.at}"></button>`).join(""));
+
+  function renderArch() {
+    if (mode !== "arch") return;
+    const S = step ? STEPS[step - 1] : null;
+    const selTask = selected && nodes.get(selected);
+    const hits = selTask ? compsOf(selTask) : [];
+    board.querySelectorAll(".blk").forEach(el => {
+      const c = COMP[el.dataset.c], tt = compTasks(c.id), k = s => tt.filter(n => st(n) === s).length;
+      const gs = !tt.length ? "todo" : k("issue") ? "issue" : k("done") === tt.length ? "done" : (k("done") || k("doing")) ? "doing" : "todo";
+      el.style.setProperty("--bc", `var(${ST[gs].v})`);
+      el.classList.toggle("planned", tt.length > 0 && k("todo") === tt.length);
+      el.classList.toggle("dim", !!((S && !S.comps.includes(c.id)) || (focusArea && !tt.some(n => areaOf(n)?.id === focusArea))));
+      el.classList.toggle("on", selComp === c.id);
+      el.classList.toggle("hit", hits.includes(c.id) && selComp !== c.id);
+      el.innerHTML = `<div class="bh"><span class="dot" style="background:var(${ST[gs].v})"></span>${esc(c.name)}</div><div class="role">${esc(c.role)}</div><div class="tech">${esc(c.tech)}</div>` +
+        (tt.length ? `<div class="seg">${ORDER.filter(s => k(s)).map(s => `<i style="flex:${k(s)};background:var(${ST[s].v})"></i>`).join("")}</div><div class="cnt">완료 ${k("done")}/${tt.length}${k("issue") ? ` · <b>문제 ${k("issue")}</b>` : ""}${k("doing") ? ` · 진행 중 ${k("doing")}` : ""}</div>` : "");
+    });
+    $("stepBtns").innerHTML = `<button type="button" data-s="0" aria-pressed="${step === 0}">전체</button>` + STEPS.map((s, i) => `<button type="button" data-s="${i + 1}" aria-pressed="${step === i + 1}" title="${esc(s.title)}">${i + 1}</button>`).join("");
+    if (S) {
+      const tt = [...new Set(S.comps.flatMap(compTasks))], d = tt.filter(n => st(n) === "done").length, is = tt.filter(n => st(n) === "issue").length;
+      $("caption").innerHTML = `<h4>${step}. ${esc(S.title)}</h4><p>${esc(typeof S.text === "function" ? S.text() : S.text)}</p><div class="meta">관련 블록 ${S.comps.length}개 · 연결된 작업 ${tt.length}건 중 완료 ${d}${is ? ` · 문제 ${is}` : ""}</div>`;
+    } else {
+      $("caption").innerHTML = `<h4>SecureLens 한눈에 보기</h4><p>회사 기밀을 미리 벡터로 저장해 두고, 밖으로 나가려는 파일이 그 기밀과 얼마나 닮았는지와 얼마나 위험한지를 계산해 안전 · 경고 · 차단을 정합니다. 번호를 누르거나 ← → 키로 단계별로 따라가 보세요.</p><div class="meta">블록을 누르면 그 부품에 연결된 작업이 보이고, 작업을 누르면 3D 진행 지도로 넘어갑니다.</div>`;
+    }
+    const fa = focusArea && nodes.get(focusArea);
+    $("crumbs").innerHTML = fa ? `<b>${esc(fa.label)}</b> 영역이 닿는 블록만 강조` : selTask ? `<b>${esc(selTask.label)}</b> 위치` : "";
+    requestAnimationFrame(drawEdges);
+  }
+
+  function drawEdges() {
+    if (mode !== "arch" || matchMedia("(max-width: 860px)").matches) { edgesSvg.innerHTML = ""; return; }
+    const B = board.getBoundingClientRect();
+    const R = id => { const r = board.querySelector(`[data-c="${id}"]`).getBoundingClientRect(); return { l: r.left - B.left, r: r.right - B.left, t: r.top - B.top, b: r.bottom - B.top, cx: (r.left + r.right) / 2 - B.left, cy: (r.top + r.bottom) / 2 - B.top }; };
+    const S = step ? STEPS[step - 1] : null;
+    const mk = (id, c) => `<marker id="${id}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill="${c}"/></marker>`;
+    let h = `<defs>${mk("ah", "#444")}${mk("ahOn", "#f4f4f4")}</defs>`;
+    for (const [f, t, flow] of EDGES) {
+      const a = R(f), b = R(t); let d;
+      if (b.l >= a.r - 4) { const x1 = a.r, x2 = b.l - 3, dx = Math.max(14, (x2 - x1) / 2); d = `M${x1} ${a.cy}C${x1 + dx} ${a.cy} ${x2 - dx} ${b.cy} ${x2} ${b.cy}`; }
+      else if (b.t >= a.b - 4) d = `M${a.cx} ${a.b}L${b.cx} ${b.t - 3}`;
+      else d = `M${a.cx} ${a.t}L${b.cx} ${b.b + 3}`;
+      const on = S ? (S.comps.includes(f) && S.comps.includes(t) && (flow === "both" || flow === S.flow)) : selComp ? (f === selComp || t === selComp) : false;
+      const off = (S || selComp) && !on;
+      h += `<path class="e${flow === "reg" ? " reg" : ""}${on ? " on" : ""}${off ? " off" : ""}" d="${d}" marker-end="url(#${on ? "ahOn" : "ah"})"/>`;
+    }
+    edgesSvg.innerHTML = h;
+  }
+  new ResizeObserver(() => requestAnimationFrame(drawEdges)).observe(board);
+
+  function renderCompDetail() {
+    const c = selComp && COMP[selComp];
+    if (!c) { detail.hidden = true; return; }
+    detail.hidden = false;
+    const tt = compTasks(c.id);
+    detail.innerHTML = `<button class="x" id="dx" aria-label="닫기">×</button><div class="path">시스템 구성도</div><h3>${esc(c.name)}</h3>
+      <div class="note">${esc(c.role)}</div><div class="tech">${esc(c.tech)}</div>
+      ${c.files.length ? `<div class="files">${c.files.map(esc).join("<br>")}</div>` : ""}
+      <hr><div class="cap">연결된 작업 ${tt.length}건 · 누르면 3D 진행 지도로 이동</div>
+      <div class="list">${tt.length ? tt.map(n => rowHtml(n, n.id === selected)).join("") : `<div class="empty-note">연결된 작업이 없습니다.</div>`}</div>`;
+    $("dx").onclick = () => { selComp = null; selected = null; refresh(); renderDetail(); };
+    detail.querySelectorAll(".row").forEach(b => b.onclick = () => openTask(b.dataset.id));
+  }
+  function openTask(id) { const n = nodes.get(id); if (!n) return; selComp = null; setMode("map"); setFocus(areaOf(n)?.id || null, false); select(id); }
+
+  function setMode(m) {
+    mode = m === "arch" ? "arch" : "map";
+    document.body.classList.toggle("arch", mode === "arch");
+    $("modes").querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", b.dataset.m === mode));
+    try { localStorage.setItem("sl-mode", mode); } catch (e) {}
+    refresh(); renderDetail();
+  }
+  $("modes").addEventListener("click", e => { const b = e.target.closest("button"); if (b && b.dataset.m !== mode) setMode(b.dataset.m); });
+  $("stepNav").addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b) return;
+    step = b.dataset.s != null ? +b.dataset.s : Math.max(0, Math.min(STEPS.length, step + +b.dataset.d));
+    selComp = null; selected = null; refresh(); renderDetail();
+  });
+  board.addEventListener("click", e => {
+    const b = e.target.closest(".blk"); if (!b) return;
+    selComp = selComp === b.dataset.c ? null : b.dataset.c; selected = null; refresh(); renderDetail();
+  });
+  document.addEventListener("keydown", e => {
+    if (mode !== "arch" || e.target.closest("input, textarea, select")) return;
+    if (e.key === "ArrowRight" || e.key === "ArrowLeft") { step = Math.max(0, Math.min(STEPS.length, step + (e.key === "ArrowRight" ? 1 : -1))); selComp = null; selected = null; refresh(); renderDetail(); }
+    else if (e.key === "Escape" && (selComp || selected)) { selComp = null; selected = null; refresh(); renderDetail(); }
+  });
+  let saved = "map"; try { saved = localStorage.getItem("sl-mode") || "map"; } catch (e) {}
+  setMode(saved);
+
+  // ---------- loop ----------
+  const v = new THREE.Vector3();
+  (function frame() {
+    requestAnimationFrame(frame);
+    if (mode === "arch") return;
+    if (tgtGoal) { controls.target.lerp(tgtGoal, .1); if (controls.target.distanceTo(tgtGoal) < .03) tgtGoal = null; }
+    if (camGoal) { camera.position.lerp(camGoal, .09); if (camera.position.distanceTo(camGoal) < .05) camGoal = null; }
+    controls.update(); renderer.render(scene, camera);
+    const W = renderer.domElement.clientWidth, H = renderer.domElement.clientHeight;
+    for (const [id, o] of objs) {
+      v.copy(o.pos); if (o.kind === "area") v.y -= o.rad * 2.3; if (o.kind === "root") v.y -= o.rad * 2.2;
+      v.project(camera);
+      const x = (v.x * .5 + .5) * W, y = (-v.y * .5 + .5) * H, behind = v.z > 1;
+      const show = !behind && (o.kind !== "task" || o.visible);
+      o.label.style.visibility = show ? "visible" : "hidden";
+      if (!show) continue;
+      const d = camera.position.distanceTo(o.pos);
+      if (o.kind === "task") o.label.style.transform = `translate(${x + 10}px, ${y}px) translateY(-50%)`;
+      else o.label.style.transform = `translate(${x}px, ${y}px) translate(-50%, 0)`;
+      o.label.style.opacity = focusArea && ((o.kind === "area" && focusArea !== id) || o.kind === "root") ? .12 : Math.max(.45, Math.min(1, 34 / d));
+      o.label.style.zIndex = Math.round(1000 - d * 10);
+    }
+  })();
+
+  // ---------- data ----------
+  const loading = $("loading");
+  // ---------- data (고정 스냅샷, 로그인 없이 표시) ----------
+  const SNAP = {"nodes": [{"id": "a_clip", "changedAt": "2026-10-13T12:00:00Z", "changedBy": "7주차 점검 (10-13 커밋·진도보고서 대조)", "label": "CLIP 이미지 임베딩 + 회전 보정", "note": "0/±45/±90/180° 회전 + 좌우 반전으로 되돌려 임베딩한 뒤 최댓값 사용, 흰 여백 제거. 45° 회전본 CLIP 0.992. 7주차: 0°에서 글자가 충분히 읽히면 회전·반전 비교 생략(SKIP_TTA_IF_UPRIGHT).", "order": 1, "owner": "윤은원", "parent": "b_ai", "status": "done", "week": 3}, {"id": "a_code", "changedAt": "2026-10-07T05:18:39Z", "changedBy": "자동 갱신", "label": "소스코드 정규화", "note": "측정 결과 불필요로 종료: 주석 제거·식별자 변경 이미 100% 탐지, 무관 코드 오탐 0%(최고 0.63). 공통 문법은 문서 빈도 가중으로 해결.", "order": 6, "owner": "윤은원", "parent": "b_ai", "status": "done", "week": 6}, {"id": "a_docs", "label": "Word · PDF · 코드 파일 탐지", "links": [{"date": "2026-09-29", "title": "Word·PDF·소스코드 기밀 탐지 경로 구현", "url": "https://app.notion.com/p/Word-PDF-3ed942e0549e81f099b6d11d84911c0c"}], "note": "docx(본문+표)·PDF 텍스트 레이어·코드 추출 → 문서 전용 컬렉션. 변형본 16건 전부 BLOCK, 무관 3건 ALLOW.", "order": 4, "owner": "윤은원", "parent": "b_ai", "status": "done", "week": 5}, {"id": "a_fast", "changedAt": "2026-10-13T12:00:00Z", "changedBy": "7주차 점검 (10-13 커밋·진도보고서 대조)", "comp": ["ocr", "clip"], "label": "OCR 재시도 동시 실행 · TTA 생략", "note": "OCR 재시도(감마·반전·9각도)를 OCR_WORKERS=4개씩 동시 실행(결과 동일), 0° 정상 이미지는 CLIP 회전·반전 생략. 이미지 1건 2.55 → 1.58초 (커밋 1dbe691).", "order": 22, "owner": "윤은원", "parent": "b_ai", "status": "done", "week": 7}, {"id": "a_ident", "changedAt": "2026-10-13T12:00:00Z", "changedBy": "7주차 점검 (10-13 커밋·진도보고서 대조)", "comp": ["sim"], "label": "1건 발췌 식별값 일치 규칙", "note": "similarity.identifier_match: 전화·이메일·주민번호·계좌·사업자번호·사번/회원ID·접수번호가 기밀 문서 1~2곳에만 있고 2개 이상 일치하면 WARNING 이상. 1명분 발췌 0/6 → 5/6 (커밋 1dbe691).", "order": 21, "owner": "윤은원", "parent": "b_ai", "status": "done", "week": 7}, {"id": "a_miss8", "changedAt": "2026-10-13T12:00:00Z", "changedBy": "7주차 점검 (10-13 커밋·진도보고서 대조)", "comp": ["ocr", "clip", "parser"], "label": "남은 미탐: 메신저 캡처 · 15° 회전 · 표 발췌 csv", "note": "7주차 기준 메신저 캡처 75%, 15° 회전 83%, 표 발췌 csv 미탐. 시나리오 불일치의 가장 큰 원인인 탐지 단계 미탐 13건 중 일부.", "order": 23, "owner": "윤은원", "parent": "b_ai", "status": "todo", "week": 8}, {"id": "a_ocr", "changedAt": "2026-10-13T12:00:00Z", "changedBy": "7주차 점검 (10-13 커밋·진도보고서 대조)", "label": "OCR (Tesseract kor+eng) + 회전 자동 보정", "note": "CLIP만 쓰면 서로 다른 문서도 0.8 전후가 나와서 OCR로 오탐을 낮춤.", "order": 2, "owner": "윤은원", "parent": "b_ai", "status": "done", "week": 3}, {"id": "a_ocrvar", "changedAt": "2026-10-07T05:18:39Z", "changedBy": "자동 갱신", "label": "변형본에 원본 OCR 텍스트 저장", "note": "register_document(..., ocr_text=원본 OCR)로 변형본에 원본 텍스트 공유 + 후보에 글자 없으면 모양 단독 판정 제한.", "order": 8, "owner": "윤은원", "parent": "b_ai", "status": "done", "week": 6}, {"id": "a_para", "changedAt": "2026-10-13T12:00:00Z", "changedBy": "7주차 점검 (10-13 커밋·진도보고서 대조)", "label": "의역 · 번역 대응 (문단 청크 임베딩)", "note": "문단 청크(MiniLM)는 구분 불가. multilingual-e5-small 의미 보조 판정(≥0.955 → WARNING) 추가 → 의역 0/5 → 3/5, JSON 변환 100%. 7주차 추가 개선 없음: 영어 번역 0/2, 다른 언어로 옮긴 코드 0/2 남음.", "order": 7, "owner": "윤은원", "parent": "b_ai", "status": "doing", "week": 7}, {"id": "a_rectify", "changedAt": "2026-10-13T12:00:00Z", "changedBy": "7주차 점검 (10-13 커밋·진도보고서 대조)", "comp": ["ocr", "clip"], "label": "모니터 촬영 원근 보정", "note": "ai/rectify.py: 밝은 문서 영역의 네 꼭짓점을 찾아 직사각형으로 펴고 선명화. 원본 OCR이 약할 때만 보정본 사용, 회전·반전 비교는 유지. 모니터 촬영 탐지 54.2% → 79.2% (커밋 1dbe691).", "order": 20, "owner": "윤은원", "parent": "b_ai", "status": "done", "week": 7}, {"id": "a_seal", "changedAt": "2026-10-13T12:00:00Z", "changedBy": "7주차 점검 (10-13 커밋·진도보고서 대조)", "label": "인감·로고 회사명 일치 검사", "links": [], "note": "회사명 불일치 규칙(pipeline._company_mismatch, config.COMPANY_NAMES): 인감·로고 자산에 우리 회사명이 있는데 업로드엔 '주식회사·대표이사'만 있고 회사명이 다르면 ALLOW. OCR이 첫 글자를 자주 놓쳐 두 글자 조각 단위로 비교. 타사 인감 오탐 5건 → 2건(10-10, 53b9942) → 1건(10-13, 원근 보정으로 촬영본 회사명도 읽힘). 남은 1건은 가운데만 자른 인감.", "order": 10, "owner": "윤은원", "parent": "b_ai", "status": "done", "week": 7}, {"id": "a_text", "label": "다국어 텍스트 임베딩 + 글자 3-gram", "note": "OCR 유사도 = 임베딩 코사인 × 0.3 + 3-gram 포함률 × 0.7. 최종 = CLIP × 0.7 + OCR × 0.3.", "order": 3, "owner": "윤은원", "parent": "b_ai", "status": "done", "week": 4}, {"id": "a_whitelist", "changedAt": "2026-10-07T05:18:39Z", "changedBy": "자동 갱신", "label": "공개 양식 화이트리스트", "links": [], "note": "register_public(UI·API)로 공개 양식 등록. 공개 양식과 60% 이상 일치 → ALLOW, 고유 내용 일치 4% 미만 → ALLOW. 빈 양식 오탐 5건 해결.", "order": 9, "owner": "윤은원", "parent": "b_ai", "status": "done", "week": 6}, {"id": "a_xlsx", "changedAt": "2026-10-07T05:18:39Z", "changedBy": "자동 갱신", "label": "엑셀(.xlsx) 파서", "note": "document_parser에 .xlsx 파서 추가(openpyxl, 모든 시트). 구분자 제거로 csv→엑셀 변환 6/6 탐지.", "order": 5, "owner": "윤은원", "parent": "b_ai", "status": "done", "week": 6}, {"id": "b_ai", "label": "AI 탐지 엔진", "note": "CLIP(모양) + OCR(이미지 속 글자) + 다국어 텍스트 임베딩 + 문서 파서.", "order": 4, "owner": "윤은원", "parent": "root", "status": "doing", "week": null}, {"id": "b_data", "label": "데이터셋", "note": "", "order": 3, "owner": "윤은원", "parent": "root", "status": "doing", "week": null}, {"id": "b_env", "label": "환경 · 인프라", "note": "", "order": 2, "owner": "윤은원", "parent": "root", "status": "doing", "week": null}, {"id": "b_eval", "changedAt": "2026-10-13T12:00:00Z", "changedBy": "7주차 점검 (10-13 커밋·진도보고서 대조)", "label": "평가 · 성능", "note": "원본 43건 등록 기준 실측 (dataset_hanbit, macOS CPU, data_gen/validate.py text|image|events). 회사 표준 빈 양식 3종을 공개 양식으로 등록한 조건.", "order": 7, "owner": "윤은원", "parent": "root", "status": "doing", "week": null}, {"id": "b_plan", "changedAt": "2026-10-06T00:00:00Z", "changedBy": "자동 갱신", "label": "기획 · 발표", "links": [{"date": "2026-10-05", "title": "SecureLens 진행사항 3D 마인드맵 시각화 제작", "url": "https://app.notion.com/p/SecureLens-3D-3f0942e0549e810f9d22d936a8598d81"}], "note": "교과 일정: 3주차 계획서 발표, 매주 진도보고서, 중간발표, 결과보고서(11/30), 최종발표.", "order": 1, "owner": "팀", "parent": "root", "status": "doing", "week": null}, {"id": "b_risk", "label": "리스크 판단", "note": "유사도 하나로 판정하던 구조를 '우리 기밀이 맞는가(M)' × '얼마나 위험한가'로 확장.", "order": 5, "owner": "김유정", "parent": "root", "status": "doing", "week": null}, {"id": "b_ui", "label": "서비스 · UI", "note": "", "order": 6, "owner": "팀", "parent": "root", "status": "doing", "week": null}, {"id": "d_align", "label": "리스크 공식에 맞춘 정책 데이터 정렬", "note": "confidential_assets_metadata.json, 사용자 역할, variant_type, desired_decision.", "order": 5, "owner": "윤은원", "parent": "b_data", "status": "done", "week": 5}, {"id": "d_conf", "changedAt": "2026-10-04T12:00:00Z", "changedBy": "Notion 카드", "label": "초기 데이터셋 CONF-001~005", "links": [{"date": "2026-10-04", "title": "SecureLens 데이터셋(test/confidential) 구조 점검", "url": "https://app.notion.com/p/SecureLens-test-confidential-3ef942e0549e819daa0cc00b81fd6be7"}], "note": "영문·숫자 식별자 파일명으로 메타데이터와 1:1 매핑.", "order": 1, "owner": "팀", "parent": "b_data", "status": "done", "week": 2}, {"id": "d_docs", "changedAt": "2026-10-06T00:00:00Z", "changedBy": "자동 갱신", "label": "데이터셋 문서화 · 검증 스크립트", "links": [{"date": "2026-10-05", "title": "SecureLens 데이터셋 구성 정리 및 검증 스크립트 작성", "url": "https://app.notion.com/p/SecureLens-3f0942e0549e81c99f46f697c255b83b"}], "note": "데이터셋_정리.md · data_gen/README_dataset.md · validate.py 작성. 변형·우회본(양성) vs 무관·공개(음성), 반출 시나리오 240건 개념 정리.", "order": 7, "owner": "윤은원", "parent": "b_data", "status": "done", "week": 6}, {"id": "d_hanbit", "changedAt": "2026-10-06T00:00:00Z", "changedBy": "자동 갱신", "label": "(주)한빛테크 기밀 원본 43건", "links": [{"date": "2026-09-29", "title": "(주)한빛테크 가상 데이터셋 구축과 기준 성능 측정", "url": "https://app.notion.com/p/3ed942e0549e8180b01ce4fabbf196a8"}, {"date": "2026-10-05", "title": "SecureLens 데이터셋 구성 정리 및 검증 스크립트 작성", "url": "https://app.notion.com/p/SecureLens-3f0942e0549e81c99f46f697c255b83b"}], "note": "4대 자산 × 사업계획서·업무보고서·제안서·품의서. 문서끼리 금액 등이 맞물리도록 작성. 개인정보는 형식만 맞춘 가짜.", "order": 3, "owner": "윤은원", "parent": "b_data", "status": "done", "week": 5}, {"id": "d_meta", "changedAt": "2026-10-06T00:00:00Z", "changedBy": "자동 갱신", "label": "메타데이터 설계 (metadata.xlsx)", "links": [{"date": "2026-10-05", "title": "SecureLens 데이터셋 구성 정리 및 검증 스크립트 작성", "url": "https://app.notion.com/p/SecureLens-3f0942e0549e81c99f46f697c255b83b"}], "note": "4단계 보안등급 등 필드 정의 완료.\n10/5 ID 접두어 오류 수정: png = IMG-001~009, docx/py = DOC-001~016으로 재부여 (로컬 수정).", "order": 2, "owner": "팀", "parent": "b_data", "status": "done", "week": 4}, {"id": "d_para", "changedAt": "2026-10-13T12:00:00Z", "changedBy": "7주차 점검 (10-13 커밋·진도보고서 대조)", "label": "진짜 의역본 · 번역본 보강", "note": "기존 dataset의 *_rewrite.docx는 부서명만 바꾼 형태라 쓰지 않고, dataset_hanbit에 사람이 다시 쓴 의역본(paraphrase)·영어 번역본을 양성으로 추가(data_gen/content_docs.py PARAPHRASES·TRANSLATIONS).", "order": 6, "owner": "윤은원", "parent": "b_data", "status": "done", "week": 5}, {"id": "d_variants", "label": "변형 413 · 무관 91 · 시나리오 240", "links": [{"date": "2026-09-29", "title": "(주)한빛테크 가상 데이터셋 구축과 기준 성능 측정", "url": "https://app.notion.com/p/3ed942e0549e8180b01ce4fabbf196a8"}], "note": "난이도 easy / medium / hard. 같은 회사 공개자료·타사 인감 등 어려운 음성 포함. data_gen/build.py로 재생성.", "order": 4, "owner": "윤은원", "parent": "b_data", "status": "done", "week": 5}, {"id": "e_git", "changedAt": "2026-10-12T15:48:12Z", "changedBy": "자동 갱신", "label": "GitHub 협업 정리", "links": [{"date": "2026-10-12", "title": "SecureLens 캐시 관리·결과 재검증 점검", "url": "https://app.notion.com/p/SecureLens-3f7942e0549e81fd8d4cde392f13ecfc"}], "note": "루트 .gitignore, __pycache__·chroma_db 추적 해제, requirements 버전 고정 (커밋 f24563c, 0812505).", "order": 3, "owner": "윤은원", "parent": "b_env", "status": "done", "week": 5}, {"id": "e_mac", "label": "macOS 이식", "links": [{"date": "2026-09-29", "title": "SecureLens 개발 환경 macOS 이식과 전 단계 재현", "url": "https://app.notion.com/p/SecureLens-macOS-3ed942e0549e81459dd6f619541dce45"}], "note": "config.py가 OS를 자동 판별해 Tesseract 경로·한글 폰트 선택. step3~step10 전 단계 macOS에서 통과.", "order": 2, "owner": "윤은원", "parent": "b_env", "status": "done", "week": 5}, {"id": "e_req", "changedAt": "2026-10-07T05:18:39Z", "changedBy": "자동 갱신", "label": "reportlab·openpyxl requirements 반영", "note": "requirements.txt에 openpyxl 3.1.5 · reportlab 5.0.1 반영 (커밋 03dd59a).", "order": 4, "owner": "윤은원", "parent": "b_env", "status": "done", "week": 6}, {"id": "e_win", "label": "Windows 환경 구축", "note": "FastAPI · Streamlit · ChromaDB · Ollama · CLIP · OCR · 텍스트 임베딩 설치와 기본 동작 확인.", "order": 1, "owner": "팀", "parent": "b_env", "status": "done", "week": 2}, {"id": "p_feedback8", "changedAt": "2026-10-13T12:00:00Z", "changedBy": "7주차 점검 (10-13 커밋·진도보고서 대조)", "label": "중간발표 피드백 반영", "note": "10/14 중간발표(소만사·내부 심사) 피드백 정리 후 반영.", "order": 21, "owner": "팀", "parent": "b_plan", "status": "todo", "week": 8}, {"id": "p_final", "label": "결과보고서 · 최종발표", "note": "결과보고서 e-class 제출 11/30.", "order": 7, "owner": "팀", "parent": "b_plan", "status": "todo", "week": 15}, {"id": "p_mid", "changedAt": "2026-10-13T12:00:00Z", "changedBy": "7주차 점검 (10-13 커밋·진도보고서 대조)", "label": "중간발표", "links": [{"date": "2026-10-10", "title": "SecureLens 7주차 PoC 완성 및 팀 통합", "url": "https://app.notion.com/p/SecureLens-7-PoC-3f5942e0549e8157b8bbfac5ab30cdd4"}, {"date": "2026-10-11", "title": "SecureLens 발표용 시스템 구성도 네온 스타일 디자인 준비", "url": "https://app.notion.com/p/SecureLens-3f6942e0549e815b9d88c87704c3fbf1"}], "note": "10/14 외부(소만사) + 내부 심사, 라이브 시연 포함. 발표 자료 완료: 7주차_중간발표_SecureLens.pptx(16장)·발표원고 10분·예상 질문 Q&A(Q1~26)·시연 가이드. 시연은 기존 탭(직원 이미지 업로드·문서 파일·관리자)으로 진행.", "order": 6, "owner": "팀", "parent": "b_plan", "status": "doing", "week": 7}, {"id": "p_proposal", "label": "계획서 발표 · 제출", "links": [{"date": "2026-09-22", "title": "산학협력 주제 선정과 SecureLens 계획 발표", "url": "https://app.notion.com/p/SecureLens-3ed942e0549e81f5b911d6ec19cdb116"}], "note": "3주차 10분 발표, 산학협력프로젝트계획서 e-class 제출(9/21).", "order": 2, "owner": "팀", "parent": "b_plan", "status": "done", "week": 3}, {"id": "p_rep4", "label": "4주차 진행보고 (0923)", "links": [{"date": "2026-09-23", "title": "교수님 피드백 5가지 반영 — 가상 기업 설정과 유사제품 비교", "url": "https://app.notion.com/p/5-3ed942e0549e816abac3e43a763f3cc5"}], "note": "피드백 5개 반영: 제목 축약, 가상 기업 설정, 유사제품 비교, 카테고리별 계획, 이메일 연동 설계.", "order": 3, "owner": "팀", "parent": "b_plan", "status": "done", "week": 4}, {"id": "p_rep5", "label": "5주차 진행보고", "note": "4주차 피드백 6개를 15장 슬라이드로 대응. 발표원고·예상 Q&A 준비 완료.", "order": 4, "owner": "팀", "parent": "b_plan", "status": "done", "week": 5}, {"id": "p_rep6", "changedAt": "2026-10-13T12:00:00Z", "changedBy": "7주차 점검 (10-13 커밋·진도보고서 대조)", "label": "6주차 진도보고서", "links": [{"date": "2026-10-06", "title": "SecureLens 6주차 발표자료 및 진도보고서 제작", "url": "https://app.notion.com/p/SecureLens-6-3f1942e0549e81e9bd13c5e533fb653c"}, {"date": "2026-10-07", "title": "SecureLens 리스크 스코어링 공식 아이디어 구체화 및 발표 자료 보완", "url": "https://app.notion.com/p/SecureLens-3f2942e0549e813e94e5f220a0379794"}], "note": "진도보고서 초안·발표원고(10분)·예상 Q&A·심화대비·PPT 작성 완료. 오탐 판단 기준(모양점수·유사도 임계값) 원고 보완(10-07). 6주차 팀 결정 항목(극비×허가, 애매 매칭)은 7주차 리스크 공식 v0.2로 정리됨.", "order": 5, "owner": "팀", "parent": "b_plan", "status": "done", "week": 6}, {"id": "p_rep7", "changedAt": "2026-10-13T12:00:00Z", "changedBy": "7주차 점검 (10-13 커밋·진도보고서 대조)", "label": "7주차 진도보고서", "note": "진도보고서_초안_7주차.md (10-10 · 10-13 갱신). 리스크 v0.2, 감사 로그·관리자 화면, 타사 인감·원근 보정·식별값 규칙·속도 개선, 실측표. ★ hard 하향 기준·T 반영 방법 팀 합의 필요.", "order": 20, "owner": "윤은원", "parent": "b_plan", "status": "doing", "week": 7}, {"id": "p_topic", "label": "주제 2 선정 · 팀 구성", "links": [{"date": "2026-09-22", "title": "산학협력 주제 선정과 SecureLens 계획 발표", "url": "https://app.notion.com/p/SecureLens-3ed942e0549e81f5b911d6ec19cdb116"}], "note": "소만사 제시 4개 주제 중 '임베딩 기반 사내 핵심 기밀 데이터 유출 차단 및 리스크 평가 시스템' 선택.", "order": 1, "owner": "팀", "parent": "b_plan", "status": "done", "week": 2}, {"id": "r_channel", "changedAt": "2026-10-13T12:00:00Z", "changedBy": "7주차 점검 (10-13 커밋·진도보고서 대조)", "label": "전송 채널 요소 추가", "note": "리스크 공식에 아직 채널 요소 없음 → 사내 메일로 정상 공유하는 경우도 차단될 수 있음. 7주차 미착수 (감사 로그에는 채널이 기록만 됨).", "order": 6, "owner": "김유정", "parent": "b_risk", "status": "todo", "week": 7}, {"id": "r_formula", "changedAt": "2026-10-13T12:00:00Z", "changedBy": "7주차 점검 (10-13 커밋·진도보고서 대조)", "label": "리스크 공식 설계 · 참조 구현", "links": [{"date": "2026-10-07", "title": "SecureLens 리스크 스코어링 공식 아이디어 구체화 및 발표 자료 보완", "url": "https://app.notion.com/p/SecureLens-3f2942e0549e813e94e5f220a0379794"}, {"date": "2026-10-10", "title": "SecureLens 7주차 PoC 완성 및 팀 통합", "url": "https://app.notion.com/p/SecureLens-7-PoC-3f5942e0549e8157b8bbfac5ab30cdd4"}, {"date": "2026-10-12", "title": "SecureLens 캐시 관리·결과 재검증 점검", "url": "https://app.notion.com/p/SecureLens-3f7942e0549e81fd8d4cde392f13ecfc"}], "note": "R = 100 · M · S · (0.5L + 0.25P + 0.25T). M 매칭 확신도, S 자산 상태(active 1.0 / archived 0.9 / deprecated 0.7), L 보안등급, P 권한 불일치, T 우회 흔적. 30 미만 안전, 30~50 경고, 50 이상 차단. v0.2: M 바닥값 0.55, 허가 사용자 최대 '경고', 극비 강제 차단은 권한 불일치일 때만 → 판단 서버 반영(merge 8082f8b).", "order": 2, "owner": "김유정", "parent": "b_risk", "status": "done", "week": 5}, {"id": "r_grid", "label": "가중치 격자 탐색 (216 조합)", "note": "등급 × 권한 × 변형 유형 216가지에서 정책표와 가장 잘 맞는 초기값.", "order": 3, "owner": "김유정", "parent": "b_risk", "status": "done", "week": 5}, {"id": "r_mismatch", "changedAt": "2026-10-10T17:29:59Z", "changedBy": "자동 갱신", "label": "정책표 vs 리스크 공식 불일치", "links": [], "note": "v0.2로 대응: 허가 사용자 최대 '경고'(극비×허가 26건), M 바닥값 0.55(애매 매칭 하락 25건). 정책표 일치 71.7% → 79.2%.", "order": 8, "owner": "팀", "parent": "b_risk", "status": "done", "week": 6}, {"id": "r_open8", "changedAt": "2026-10-13T12:00:00Z", "changedBy": "7주차 점검 (10-13 커밋·진도보고서 대조)", "comp": ["risk"], "label": "hard 하향 기준 · 우회 계수 T 반영 (팀 결정)", "note": "정책표는 어려운 변형이면 한 단계 낮추지만 실제로는 좌우 반전·메신저 캡처도 강하게 매칭됨(16건). 원본만 등록하면 변형 유형을 알 수 없어 T가 거의 0(44건 중 T>0 19건). 난이도 라벨 대신 매칭 강도로 낮출지, T를 어떻게 줄지 결정 필요.", "order": 20, "owner": "팀", "parent": "b_risk", "status": "issue", "week": 7}, {"id": "r_perm", "changedAt": "2026-10-07T05:18:39Z", "changedBy": "자동 갱신", "label": "P(권한 불일치도) 유지 실험", "links": [], "note": "216 케이스 비교: 현재 공식 88.0%, P 포함 최적 89.4%, P 제거 최적 76.9% → P 유지 결론. compare_perm.py · analyze_events.py.", "order": 7, "owner": "김유정", "parent": "b_risk", "status": "done", "week": 6}, {"id": "r_policy", "changedAt": "2026-10-13T12:00:00Z", "changedBy": "7주차 점검 (10-13 커밋·진도보고서 대조)", "label": "유사도 1차 판정 (3단계 정책)", "note": "이미지(CLIP+OCR) ≥0.80 BLOCK / ≥0.70 WARNING, 글자 없는 CLIP 단독 ≥0.95 / ≥0.78. 문서 파일 ≥0.85 / ≥0.65 (+ e5 의미 유사도 ≥0.955 → WARNING). 6주차부터는 이 단계를 통과한 후보에 리스크 공식으로 최종 판정 (config.py).", "order": 1, "owner": "김유정", "parent": "b_risk", "status": "done", "week": 3}, {"id": "r_profile", "changedAt": "2026-10-13T12:00:00Z", "changedBy": "7주차 점검 (10-13 커밋·진도보고서 대조)", "label": "위험도 정책 프로필 (비용 기반 임계값)", "links": [{"date": "2026-10-07", "title": "SecureLens 리스크 스코어링 공식 아이디어 구체화 및 발표 자료 보완", "url": "https://app.notion.com/p/SecureLens-3f2942e0549e813e94e5f220a0379794"}], "note": "risk_profile.py 업로드: 회사별 FN/FP 비용 비율로 기대비용 최소 임계값·τ 구간 자동 선택. 프리셋 보안우선/균형/업무우선. config.RISK_PROFILE 훅이 아직 없어 판단 서버와는 미연동인 독립 도구, 검증 결과 없음.", "order": 9, "owner": "김유정", "parent": "b_risk", "status": "doing", "week": 6}, {"id": "r_rules", "changedAt": "2026-10-13T12:00:00Z", "changedBy": "7주차 점검 (10-13 커밋·진도보고서 대조)", "label": "강제 규칙 6종 (v0.2)", "note": "점수 0 처리: 화이트리스트 자산 · 매칭 없음 · 일반 등급. 판정 상향: 극비 자산 강한 매칭 → 차단(v0.2부터 권한 불일치일 때만) · 기밀 이상 + 워터마크 제거 흔적 → 경고. v0.2 추가: 허가 사용자는 최대 '경고'.", "order": 4, "owner": "김유정", "parent": "b_risk", "status": "done", "week": 5}, {"id": "r_server", "changedAt": "2026-10-07T05:18:39Z", "changedBy": "자동 갱신", "label": "판단 서버(FastAPI) 연결", "links": [{"date": "2026-10-06", "title": "SecureLens 6주차 위험도 계산 로직 검증 및 커밋/푸시", "url": "https://app.notion.com/p/SecureLens-6-3f1942e0549e81d4b4f0ea0414bbe922"}], "note": "risk_scorer.py를 판단 서버에 연결(risk_engine.py, 커밋 b187613). 반출 시나리오 240건 정책표 일치 63.7% → 71.7%.", "order": 5, "owner": "김유정", "parent": "b_risk", "status": "done", "week": 6}, {"id": "root", "label": "SecureLens", "note": "임베딩 기반 변형 우회 탐지 및 기밀 유출 차단 시스템 (소만사 연계 주제 2).\n사내 기밀(문서·도면·소스코드·임직원/고객 정보)을 벡터화해 업로드 파일과의 유사도·리스크를 계산하고 ALLOW / WARNING / BLOCK으로 판정. 전 과정 온프레미스.", "order": 0, "owner": "김유정 · 윤은원", "parent": "", "status": "doing", "week": null}, {"id": "u_admin", "changedAt": "2026-10-13T12:00:00Z", "changedBy": "7주차 점검 (10-13 커밋·진도보고서 대조)", "comp": ["admin"], "label": "정책 관리 화면 (임계값·가중치 수정)", "note": "Streamlit 🛡️ 관리자 탭: 차단·경고 기준·가중치·M 바닥값·허가자 상한 수정 → 다음 판정부터 적용(policy_settings.json, GET/POST /policy). 등급×권한 판정표 미리보기·공개 양식 관리 포함.", "order": 5, "owner": "김유정", "parent": "b_ui", "status": "done", "week": 7}, {"id": "u_api", "changedAt": "2026-10-13T12:00:00Z", "changedBy": "7주차 점검 (10-13 커밋·진도보고서 대조)", "label": "FastAPI 엔드포인트", "links": [{"date": "2026-10-05", "title": "SecureLens PoC 백엔드·벡터DB·프론트엔드 파이프라인 구현", "url": "https://app.notion.com/p/SecureLens-PoC-DB-3f0942e0549e813893b8ff7d40f16810"}], "note": "/register, /detect, /documents, /health, /register_file, /detect_file, /files, /public, /register_public. 7주차: /audit_log, GET·POST /policy 추가. 기밀 원문은 응답에 포함하지 않음.", "order": 1, "owner": "윤은원", "parent": "b_ui", "status": "done", "week": 5}, {"id": "u_audit", "changedAt": "2026-10-13T12:00:00Z", "changedBy": "7주차 점검 (10-13 커밋·진도보고서 대조)", "comp": ["admin", "verdict"], "label": "보안팀 감사 로그", "links": [], "note": "audit_log.py → runtime/audit_log.jsonl. 판정 1건=1줄(사용자·채널·파일 SHA-256·판정·R 분해). 파일 내용·OCR 텍스트 미저장. GET /audit_log, 관리자 탭 조회·CSV.", "order": 7, "owner": "윤은원", "parent": "b_ui", "status": "done", "week": 7}, {"id": "u_demo", "changedAt": "2026-10-13T12:00:00Z", "changedBy": "7주차 점검 (10-13 커밋·진도보고서 대조)", "comp": ["admin", "data"], "label": "중간발표 시연 준비 (demo_setup.py)", "links": [{"date": "2026-10-10", "title": "SecureLens 7주차 PoC 완성 및 팀 통합", "url": "https://app.notion.com/p/SecureLens-7-PoC-3f5942e0549e8157b8bbfac5ab30cdd4"}], "note": "tools/demo_setup.py --reset로 실제 DB에 자산 43 + 공개 양식 3 등록(약 3분), 실행기가 DB가 비면 자동 실행. 같은 파일을 여러 사용자가 보내면 pipeline.reassess()로 리스크만 재계산. '🎬 시연' 탭은 10-10에 만들었다가 10-13 제거(3fb1233) — 기존 탭으로 시연. step12 테스트 23/23.", "order": 8, "owner": "윤은원", "parent": "b_ui", "status": "done", "week": 7}, {"id": "u_mail", "label": "메일 게이트웨이 연동 (확장)", "note": "이번 학기는 검사 API까지. 차단 시 반송 안내 메일 설계, 8~10주차 모의 연동 시연.", "order": 6, "owner": "팀", "parent": "b_ui", "status": "todo", "week": 9}, {"id": "u_notice", "changedAt": "2026-10-10T17:29:59Z", "changedBy": "자동 갱신", "label": "차단 시 사용자 안내 화면", "note": "차단 안내 문구를 요구사항 문구(\"사내 핵심 기밀로 분류된 자료입니다…\")로 변경(7주차). 승인 요청·이의 신청 흐름은 설계안.", "order": 4, "owner": "팀", "parent": "b_ui", "status": "doing", "week": 6}, {"id": "u_ollama", "label": "Ollama llama3 판정 설명문", "note": "LLM은 판정하지 않고 결과를 관리자용 문장으로 설명만 함. 꺼져 있어도 탐지는 동작.", "order": 3, "owner": "윤은원", "parent": "b_ui", "status": "done", "week": 4}, {"id": "u_report8", "changedAt": "2026-10-13T12:00:00Z", "changedBy": "7주차 점검 (10-13 커밋·진도보고서 대조)", "comp": ["admin"], "label": "감사 로그 기반 보안팀 현황 리포트", "note": "부서별·자산별 차단 건수 리포트 (7주차 진도보고서 8주차 계획).", "order": 20, "owner": "윤은원", "parent": "b_ui", "status": "todo", "week": 8}, {"id": "u_streamlit", "changedAt": "2026-10-13T12:00:00Z", "changedBy": "7주차 점검 (10-13 커밋·진도보고서 대조)", "label": "Streamlit 업로드 테스트 화면", "links": [{"date": "2026-10-05", "title": "SecureLens PoC 백엔드·벡터DB·프론트엔드 파이프라인 구현", "url": "https://app.notion.com/p/SecureLens-PoC-DB-3f0942e0549e813893b8ff7d40f16810"}], "note": "5개 탭: 등록·우회 테스트 / 직원 이미지 업로드 / 변형별 비교표 / 문서 파일(Word·Excel·PDF·코드) / 관리자(정책·감사 로그). 6주차: 리스크 점수와 등급·권한·우회 분해 표시, 업로드 사용자 선택 추가.", "order": 2, "owner": "윤은원", "parent": "b_ui", "status": "done", "week": 5}, {"id": "v_doc", "changedAt": "2026-10-13T12:00:00Z", "changedBy": "7주차 점검 (10-13 커밋·진도보고서 대조)", "label": "문서·코드 탐지율 93.3% (오탐 0%)", "links": [{"date": "2026-09-29", "title": "(주)한빛테크 가상 데이터셋 구축과 기준 성능 측정", "url": "https://app.notion.com/p/3ed942e0549e8180b01ce4fabbf196a8"}, {"date": "2026-10-06", "title": "SecureLens 6주차 위험도 계산 로직 검증 및 커밋/푸시", "url": "https://app.notion.com/p/SecureLens-6-3f1942e0549e81d4b4f0ea0414bbe922"}], "note": "5주차 83.4%/2.6% → 6주차 90.2%/0% → 7주차 93.3%/0% (양성 193·음성 38). 개인정보·거래처 1건 발췌 0/6 → 5/6(식별값 규칙). 남은 미탐: 영어 번역 0/2, 다른 언어로 옮긴 코드 0/2, 식별값 없는 1명분 발췌 1건.", "order": 2, "owner": "윤은원", "parent": "b_eval", "status": "doing", "week": 7}, {"id": "v_fp", "changedAt": "2026-10-13T12:00:00Z", "changedBy": "7주차 점검 (10-13 커밋·진도보고서 대조)", "label": "이미지 오탐 45.3% → 1.9%", "links": [{"date": "2026-09-30", "title": "변형본 동시 등록 실험으로 이미지 오탐 원인 규명", "url": "https://app.notion.com/p/3ed942e0549e81cbbf0bf933c4d28d39"}, {"date": "2026-10-06", "title": "SecureLens 6주차 위험도 계산 로직 검증 및 커밋/푸시", "url": "https://app.notion.com/p/SecureLens-6-3f1942e0549e81d4b4f0ea0414bbe922"}], "note": "5주차 45.3% → 6주차 9.4% → 10-10 3.8%(회사명 규칙) → 10-13 1.9%(원근 보정, 음성 53 중 1건). 남은 1건: 가운데만 자른 타사 인감(회사명이 잘려 모양만 남음).", "order": 3, "owner": "윤은원", "parent": "b_eval", "status": "done", "week": 7}, {"id": "v_img", "changedAt": "2026-10-13T12:00:00Z", "changedBy": "7주차 점검 (10-13 커밋·진도보고서 대조)", "label": "변형 이미지 탐지율 93.2%", "links": [{"date": "2026-09-29", "title": "(주)한빛테크 가상 데이터셋 구축과 기준 성능 측정", "url": "https://app.notion.com/p/3ed942e0549e8180b01ce4fabbf196a8"}], "note": "89.1% → 90.5%(6주차) → 93.2%(7주차), BLOCK 비율 55.0% → 73.6% → 76.8% (양성 220). 좌우 반전 42% → 92%. 모니터 촬영 54.2% → 79.2%(정답 원본 매칭 12 → 20건). 남은 약점: 메신저 캡처 75%, 15° 회전 83%.", "order": 1, "owner": "윤은원", "parent": "b_eval", "status": "done", "week": 7}, {"id": "v_scen", "changedAt": "2026-10-13T12:00:00Z", "changedBy": "7주차 점검 (10-13 커밋·진도보고서 대조)", "label": "반출 시나리오 240건 정답 일치 80.0%", "links": [], "note": "유사도만 63.7% → 리스크 공식 71.7% → v0.2 79.2%(10-10) → 80.0%(10-13). 차단 대상 통과 1.7% → 1.2%(3건), 무관 파일 오탐 5.1%. 불일치 48건의 가장 큰 원인은 탐지 단계 미탐 13건.", "order": 6, "owner": "윤은원", "parent": "b_eval", "status": "done", "week": 7}, {"id": "v_speed", "changedAt": "2026-10-13T12:00:00Z", "changedBy": "7주차 점검 (10-13 커밋·진도보고서 대조)", "label": "판정 속도 (목표 0.5초)", "note": "평균 판정 시간(240건) 1.62초(6주차) → 1.08초(7주차). 이미지 1건 2.55 → 1.58초(60건 A/B, 판정 동일). 시간 대부분이 OCR. 목표 0.5초 미달 → 8주차 OCR 경량화·같은 파일 결과 캐시.", "order": 4, "owner": "윤은원", "parent": "b_eval", "status": "issue", "week": 7}, {"id": "v_varexp", "changedAt": "2026-10-07T05:18:39Z", "changedBy": "자동 갱신", "label": "변형본 동시 등록 실험 재측정", "links": [{"date": "2026-09-30", "title": "변형본 동시 등록 실험으로 이미지 오탐 원인 규명", "url": "https://app.notion.com/p/3ed942e0549e81cbbf0bf933c4d28d39"}], "note": "원본 OCR 텍스트 공유 후 재측정: 탐지 100%/오탐 100% → 97.3%/28.3% → 95.9%/20.8%.", "order": 5, "owner": "윤은원", "parent": "b_eval", "status": "done", "week": 6}], "meta": {"cardsLinked": ["3ed942e0-549e-81f5-b911-d6ec19cdb116", "3ed942e0-549e-816a-bac3-e43a763f3cc5", "3ed942e0-549e-8145-9dd6-f619541dce45", "3ed942e0-549e-81f0-99b6-d11d84911c0c", "3ed942e0-549e-8180-b01c-e4fabbf196a8", "3ed942e0-549e-81cb-bf0b-f933c4d28d39", "3ef942e0-549e-819d-aa0c-c00b81fd6be7", "3f0942e0-549e-81c9-9f46-f697c255b83b", "3f0942e0-549e-8138-93b8-ff7d40f16810", "3f0942e0-549e-810f-9d22-d936a8598d81", "3f1942e0-549e-81d4-b4f0-ea0414bbe922", "3f1942e0-549e-81e9-bd13-c5e533fb653c", "3f2942e0-549e-813e-94e5-f220a0379794", "3f5942e0-549e-8157-b8bb-fac5ab30cdd4", "3f6942e0-549e-815b-9d88-c87704c3fbf1", "3f7942e0-549e-81fd-8d4c-de392f13ecfc"], "lastCommit": "aba1795", "lastRun": "2026-10-13T12:00:00Z", "summary": "7주차 점검: 10-13 커밋 3개(원근 보정·식별값 규칙·속도, 시연 탭 제거, 재측정)와 진도보고서 반영, 새 작업 8개, 틀린 설명 수정."}};
+  canWrite = false;
+  (() => {
+    const m = SNAP.meta, el = $("sync");
+    if (m && m.lastRun) {
+      const when = new Date(m.lastRun);
+      el.innerHTML = `데이터 기준 <b>${when.toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</b> (공개용 고정본)`;
+      if (m.summary) el.append(document.createElement("br"), document.createTextNode(m.summary));
+    }
+    nodes = new Map(SNAP.nodes.filter(x => x && x.label).map(x => [x.id, x]));
+    loading.hidden = nodes.size > 0;
+    if (!nodes.size) loading.textContent = "아직 등록된 작업이 없습니다.";
+    rebuild();
+    renderDetail();
+  })();
+})();
+</script>
+
+</body></html>
